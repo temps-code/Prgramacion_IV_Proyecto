@@ -1,11 +1,14 @@
-import { ScrollView, Text, View } from "react-native";
-import { Link } from 'expo-router';
+import { Alert, ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { useEffect, useState } from "react";
+import ReservationsCard from "../components/user/reservationsCard";
+import NewReservationModal from "../components/user/NewReservationModal";
+import ReservationCardFactory from "../components/user/ReservationCardFactory";
+import ReservationBridge from "../components/user/ReservationBridge";
 
 export default function Reservations() {
     interface IReservation {
-        clientName: string;
-        serviceName: string;
+        clientNameID: string;
+        serviceNameID: string;
         dateReservation: string;
         startTime: string;
         endTime: string;
@@ -50,7 +53,8 @@ export default function Reservations() {
         Canceladas: 0,
         Finalizadas: 0,
     });
-
+    const [modalVisible, setModalVisible] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const fetchArtists = async () => {
         try {
             const response = await fetch("https://67c7ff69c19eb8753e7bcb97.mockapi.io/user/reservations");
@@ -68,6 +72,64 @@ export default function Reservations() {
     useEffect(() => {
         fetchArtists();
     }, []);
+
+
+
+    const handleDelete = async (id: string) => {
+        console.log('eliminar');
+        try {
+            const response = await fetch(`https://67c7ff69c19eb8753e7bcb97.mockapi.io/user/reservations/${id}`, {
+                method: "DELETE",
+            });
+            // Actualizar el conteo de estados
+
+            if (!response.ok) throw new Error("Error al eliminar la reserva");
+
+            // Actualizar el estado local
+            setReservations(prev => {
+                const nuevasReservas = prev.filter(reserva => reserva.id !== id);
+                // Actualizar los contadores
+                setStatusCounts(countReservationsByStatus(nuevasReservas));
+                return nuevasReservas;
+            });
+
+            return id;
+        } catch (error) {
+            console.error("Error al eliminar reserva:", error);
+            throw error;
+        }
+    };
+
+
+
+    const handleCreateReservation = async (newReservation: any) => {
+        setIsSubmitting(true);
+        try {
+            const response = await fetch("https://67c7ff69c19eb8753e7bcb97.mockapi.io/user/reservations", {
+                method: "POST",
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newReservation)
+            });
+
+            if (!response.ok) throw new Error("Error creando reserva");
+
+            const data = await response.json();
+
+            setReservations(prev => {
+                const actualizadas = [...prev, data];
+                setStatusCounts(countReservationsByStatus(actualizadas));
+                return actualizadas;
+            });
+
+            Alert.alert("Éxito", "Reserva creada correctamente");
+
+        } catch (error) {
+            console.error("Error:", error);
+            Alert.alert("Error", "No se pudo crear la reserva");
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
 
 
     return (
@@ -135,67 +197,55 @@ export default function Reservations() {
                         </View>
                     </View>
                     <View className="bg-indigo-600 rounded-lg px-4 py-2 flex-row items-center gap-2">
-                        {/* SVG aquí */}
-                        <Text className="text-white text-base font-['Roboto']">
-                            Nueva Reserva
-                        </Text>
+                        <View className="flex-1">
+                            {/* Botón existente en tu barra de herramientas */}
+                            <TouchableOpacity
+                                className="bg-indigo-600 rounded-lg px-4 py-2 flex-row items-center gap-2"
+                                onPress={() => setModalVisible(true)}
+                            >
+                                <Text className="text-white text-base font-['Roboto']">
+                                    Nueva Reserva
+                                </Text>
+                            </TouchableOpacity>
+
+                            <NewReservationModal
+                                visible={modalVisible}
+                                onClose={() => setModalVisible(false)}
+                                onSubmit={handleCreateReservation}
+                                isSubmitting={isSubmitting}
+                            />
+                        </View>
                     </View>
                 </View>
 
-                {/* Tabla de Reservas */}
                 <ScrollView horizontal className="bg-white">
                     <View className="min-w-[800px]">
                         {/* Encabezados de Tabla */}
                         <View className="flex-row bg-gray-50 p-4 border-b border-gray-200">
-                            {['Cliente', 'Servicio', 'Fecha', 'Hora', 'Estado', 'Acciones'].map((header) => (
-                                <View key={header} className="flex-1 min-w-[120px] px-2">
-                                    <Text className="text-gray-500 text-xs font-medium font-['Roboto']">
-                                        {header}
-                                    </Text>
+                            {["Cliente", "Servicio", "Fecha", "Hora", "Estado", "Acciones"].map((header) => (
+                                <View
+                                    key={header}
+                                    className={`${header === "Cliente"
+                                        ? "min-w-[300px]"
+                                        : header === "Servicio"
+                                            ? "min-w-[120px]"
+                                            : header === "Fecha"
+                                                ? "min-w-[100px]"
+                                                : header === "Hora"
+                                                    ? "min-w-[80px]"
+                                                    : header === "Estado"
+                                                        ? "min-w-[100px]"
+                                                        : "min-w-[80px]"
+                                        } flex-1 px-2`}
+                                >
+                                    <Text className="text-gray-500 text-xs font-medium font-['Roboto']">{header}</Text>
                                 </View>
                             ))}
                         </View>
 
-                        {/* Filas de Datos */}
-                        {[1, 2, 3].map((item) => (
-                            <View key={item} className="flex-row p-4 border-b border-gray-200 items-center">
-                                <View className="flex-1 min-w-[150px] flex-row items-center gap-2">
-                                    {/* SVG aquí */}
-                                    <View>
-                                        <Text className="text-black text-base font-medium font-['Roboto']">
-                                            María García
-                                        </Text>
-                                        <Text className="text-gray-500 text-sm font-['Roboto']">
-                                            maria@email.com
-                                        </Text>
-                                    </View>
-                                </View>
-                                <View className="flex-1 min-w-[120px]">
-                                    <Text className="text-black text-base font-['Roboto']">
-                                        Corte de Cabello
-                                    </Text>
-                                </View>
-                                <View className="flex-1 min-w-[100px]">
-                                    <Text className="text-black text-base font-['Roboto']">
-                                        15 Mar 2025
-                                    </Text>
-                                </View>
-                                <View className="flex-1 min-w-[80px]">
-                                    <Text className="text-black text-base font-['Roboto']">
-                                        10:00 AM
-                                    </Text>
-                                </View>
-                                <View className="flex-1 min-w-[100px]">
-                                    <View className="bg-amber-100 rounded-full px-3 py-1 self-start">
-                                        <Text className="text-amber-800 text-sm font-['Roboto']">
-                                            Pendiente
-                                        </Text>
-                                    </View>
-                                </View>
-                                <View className="flex-1 min-w-[80px]">
-                                    {/* SVG de acciones aquí */}
-                                </View>
-                            </View>
+                        {/* Uso del Bridge para renderizar cada reserva */}
+                        {reservations.map((item) => (
+                            <ReservationBridge key={item.id} data={item} onDelete={handleDelete} />
                         ))}
                     </View>
                 </ScrollView>
@@ -203,7 +253,7 @@ export default function Reservations() {
                 {/* Paginación */}
                 <View className="p-4 bg-white border-t border-gray-200 flex-col md:flex-row justify-between items-center">
                     <Text className="text-gray-500 text-sm font-['Roboto'] mb-2 md:mb-0">
-                        Mostrando 1-10 de 25 reservas
+                        Mostrando 1-{reservations.length} de {reservations.length} reservas
                     </Text>
                     <View className="flex-row gap-2">
                         <View className="border border-gray-200 rounded px-4 py-1">
